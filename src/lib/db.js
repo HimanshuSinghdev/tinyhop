@@ -159,6 +159,7 @@ export async function hitRateLimit(db, key, windowEndsAt) {
 export function purgeOld(db, now) {
   return db.batch([
     db.prepare('DELETE FROM rate_limits WHERE expires_at < ?').bind(now),
+    db.prepare('DELETE FROM reports WHERE ts < ?').bind(now - 180 * DAY_MS),
     db.prepare('DELETE FROM clicks WHERE ts < ?').bind(now - 365 * DAY_MS),
     db
       .prepare('DELETE FROM clicks WHERE code IN (SELECT code FROM links WHERE expires_at < ?)')
@@ -168,3 +169,11 @@ export function purgeOld(db, now) {
       .bind(now - 30 * DAY_MS),
   ]);
 }
+
+// ---------- abuse reports ----------
+
+export const insertReport = (db, report) =>
+  db
+    .prepare('INSERT INTO reports (code, reason, details, ts) VALUES (?, ?, ?, ?)')
+    .bind(report.code, report.reason, report.details, report.ts)
+    .run();

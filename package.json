@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "node --check src/worker.js && node --check public/app.js",
+    "check": "node --check src/worker.js && node --check public/app.js && node --check public/report.js",
     "smoke": "node test/smoke.mjs"
   },
   "devDependencies": {

@@ -6,10 +6,10 @@
 //   else          Worker never sees them, so they cost nothing and load instantly
 
 import { bearerToken, newToken, sha256Hex, tokenMatches } from './lib/auth.js';
-import { checkAlias, isReserved, randomCode } from './lib/codes.js';
+import { ALIAS_PATTERN, checkAlias, isReserved, randomCode } from './lib/codes.js';
 import {
   deleteLink, ensureSchema, getLink, getStats, hitRateLimit, insertLink,
-  lookupLinks, purgeOld, reclaimExpired, recordClick,
+  insertReport, lookupLinks, purgeOld, reclaimExpired, recordClick,
 } from './lib/db.js';
 import { CORS_HEADERS, SECURITY_HEADERS, fail, json, readJson } from './lib/http.js';
 import { normalizeTarget, parseList } from './lib/url.js';
@@ -26,6 +26,7 @@ const EXPIRY_CHOICES = {
   '365d': 365 * 86_400_000,
 };
 const MAX_CACHE_SECONDS = 60; // how long an edge location may remember a redirect
+const REPORT_REASONS = ['phishing', 'malware', 'spam', 'illegal', 'other'];
 
 export default {
   async fetch(request, env, ctx) {
@@ -72,6 +73,7 @@ async function api(request, env, url) {
   }
   if (pathname === '/api/links' && method === 'POST') return createLink(request, env, url);
   if (pathname === '/api/links/lookup' && method === 'POST') return lookup(request, env);
+  if (pathname === '/api/report' && method === 'POST') return reportLink(request, env);
 
   const check = /^\/api\/check\/([^/]+)$/.exec(pathname);
   if (check && method === 'GET') return checkAvailability(env, decodeURIComponent(check[1]));
@@ -305,4 +307,23 @@ async function lookup(request, env) {
     }
   }
   return json({ links });
+}
+
+// Public abuse report. Stores the short code, a reason and an optional note, never who sent it.
+async function reportLink(request, env) {
+  const tooMany = await limited(request, env, 'report', 5);
+  if (tooMany) return tooMany;
+
+  const body = await readJson(request);
+  const code = typeof body?.code === 'string' ? body.code.trim() : '';
+  if (!ALIAS_PATTERN.test(code)) return fail(400, 'invalid_code', 'Enter the short link or its code.');
+  if (!REPORT_REASONS.includes(body.reason)) {
+    return fail(400, 'invalid_reason', `Reason must be one of: ${REPORT_REASONS.join(', ')}.`);
+  }
+  const details = typeof body.details === 'string' ? body.details.trim().slice(0, 500) : '';
+
+  await ensureSchema(env.DB);
+  if (!(await getLink(env.DB, code))) return fail(404, 'not_found', 'That link does not exist.');
+  await insertReport(env.DB, { code, reason: body.reason, details, ts: Date.now() });
+  return json({ reported: true }, 201);
 }

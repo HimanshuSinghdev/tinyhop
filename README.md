@@ -34,6 +34,7 @@ Honest limits: the Cache API does not work on `*.workers.dev` addresses, so unti
 |---|---|---|
 | You shorten a link | the link, short code, created and expiry times, SHA-256 hash of your manage key | name, email, IP address |
 | A human clicks | day, country, device type, browser family, referrer domain | IP address, cookies, full user agent, full referrer URL |
+| Someone reports a link | short code, reason, optional note (500 characters), time. Deleted after 180 days | who reported it |
 | Anyone creates or deletes | a salted hash of the IP plus the minute, to rate limit | the IP itself. Rows are deleted when the minute ends |
 
 Bots and link previews (Googlebot, WhatsApp previews and similar) are not counted. The exact SQL is in [`schema.sql`](schema.sql) and [`src/lib/db.js`](src/lib/db.js).
@@ -56,6 +57,7 @@ Base URL is wherever you deploy. No API key. Errors look like `{"error":{"code":
 | `POST /api/links/lookup` | `{"items":[{"code","token"}]}` (max 50) | current click counts for links whose key matches |
 | `GET /api/check/:alias` | none | `{"available": true\|false, "reason"}` |
 | `GET /api/health` | none | `{"ok": true}` |
+| `POST /api/report` | `{"code", "reason": "phishing\|malware\|spam\|illegal\|other", "details"?}` | `201 {"reported": true}`. 5 per minute per visitor |
 | `GET /:code` | none | `302` to the original link, `404` unknown, `410` expired |
 
 ```bash
@@ -109,6 +111,19 @@ npm run deploy
 
 Some tests create many links quickly, so for a full run start the dev server with `npx wrangler dev --var RATE_CREATE_PER_MIN:40`.
 
+## Handling abuse reports
+
+The home page footer links to a public report form (`/report.html`). Reports land in the `reports` table. To review and act, open the Cloudflare dashboard, **Storage & databases, D1, tinyhop, Console**, and run:
+
+```sql
+SELECT r.id, r.code, r.reason, r.details, l.url FROM reports r LEFT JOIN links l ON l.code = r.code ORDER BY r.ts DESC LIMIT 50;
+-- to remove a bad link and its click data:
+DELETE FROM clicks WHERE code = 'THECODE';
+DELETE FROM links WHERE code = 'THECODE';
+```
+
+A removed link can still redirect from an edge cache for up to 60 seconds on a custom domain.
+
 ## Settings (`vars` in `wrangler.jsonc`)
 
 | Name | Default | Meaning |
@@ -142,7 +157,7 @@ Cloudflare's free plan caps Worker requests and D1 reads and writes per day. A c
 ## Roadmap
 
 - Google Safe Browsing check when links are created
-- A "report this link" button and abuse queue
+- A small admin page to review reports and disable links without SQL
 - Edit a link's destination, password-protected links
 - Public stats page toggle
 - D1 read replication for faster cache misses far from the primary region
