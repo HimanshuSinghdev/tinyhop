@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tinyhop: fast, open-source link shortener</title>
+  <meta name="description" content="Paste a long link and get a short one in a blink. No sign-up, no tracking of you, and every line of code is public.">
+  <meta name="theme-color" content="#F4F7FC" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0A1022" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Tinyhop: fast, open-source link shortener">
+  <meta property="og:description" content="Paste a long link and get a short one in a blink. No sign-up, and every line of code is public.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#url">Skip to the link box</a>
+
+  <header class="site">
+    <a class="brand" href="/">
+      <img src="/favicon.svg" width="32" height="32" alt="">
+      <span>Tinyhop</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="#api">API</a>
+      <a href="https://github.com/himanshusinghdev/tinyhop" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="title">
+      <h1 id="title">Make long links short.</h1>
+      <p class="lead">Paste a link and get a short one. No sign-up needed, and the whole thing is open source.</p>
+
+      <form id="shorten-form" novalidate>
+        <label class="sr-only" for="url">Link to shorten</label>
+        <div class="bar">
+          <input id="url" name="url" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" placeholder="Paste a long link" required>
+          <button id="paste-btn" class="ghost" type="button" hidden>Paste</button>
+          <button id="submit-btn" class="primary" type="submit">Shorten</button>
+        </div>
+
+        <details class="options">
+          <summary>Custom alias and expiry</summary>
+          <div class="options-grid">
+            <div class="field">
+              <label for="alias">Alias</label>
+              <div class="alias-input">
+                <span id="alias-prefix" aria-hidden="true"></span>
+                <input id="alias" name="alias" type="text" autocomplete="off" autocapitalize="off"
+                       autocorrect="off" spellcheck="false" maxlength="32" placeholder="my-link" aria-describedby="alias-hint">
+              </div>
+              <p id="alias-hint" class="hint" aria-live="polite"></p>
+            </div>
+            <div class="field">
+              <label for="expiry">Expires</label>
+              <select id="expiry" name="expiry">
+                <option value="never">Never</option>
+                <option value="1h">After 1 hour</option>
+                <option value="1d">After 1 day</option>
+                <option value="7d">After 7 days</option>
+                <option value="30d">After 30 days</option>
+                <option value="365d">After 1 year</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <p id="msg" class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section id="result" class="result" aria-labelledby="result-title" hidden>
+      <h2 id="result-title" class="sr-only">Your short link</h2>
+      <a id="short-link" class="short" target="_blank" rel="noopener"></a>
+      <div class="actions">
+        <button id="copy-btn" class="primary small" type="button">Copy link</button>
+        <button id="share-btn" class="ghost small" type="button" hidden>Share</button>
+        <button id="qr-btn" class="ghost small" type="button">QR code</button>
+      </div>
+
+      <div class="ruler" aria-hidden="true">
+        <div class="ruler-row">
+          <span>Before</span>
+          <div class="track"><div id="long-fill" class="fill long"></div></div>
+        </div>
+        <div class="ruler-row">
+          <span>After</span>
+          <div class="track"><div id="short-fill" class="fill short"></div></div>
+        </div>
+      </div>
+      <p id="saved" class="saved"></p>
+      <p id="result-meta" class="muted"></p>
+      <p class="muted">Your manage key is saved in this browser. It lets you see clicks and delete this link.</p>
+    </section>
+
+    <section id="history" class="history" aria-labelledby="history-title">
+      <h2 id="history-title">Your links</h2>
+      <ul id="history-list" class="rows"></ul>
+      <p id="history-empty" class="empty">Links you create show up here with their click counts. They stay in this browser, so we never need your email.</p>
+    </section>
+
+    <section class="trust" aria-labelledby="trust-title">
+      <h2 id="trust-title">What we store, exactly</h2>
+      <dl>
+        <div>
+          <dt>When you shorten a link</dt>
+          <dd>The link, its short code, when it was created and when it expires, plus a hash of your manage key. Never your name, email or IP address.</dd>
+        </div>
+        <div>
+          <dt>When someone clicks</dt>
+          <dd>The day, country, device type, browser family and the website they came from (domain only). No IP address and no cookies. Bots and link previews are not counted.</dd>
+        </div>
+        <div>
+          <dt>To stop spam</dt>
+          <dd>A salted hash of your IP address, kept for one minute so we can limit how fast links are created.</dd>
+        </div>
+        <div>
+          <dt>Deleting</dt>
+          <dd>Delete a link from your list and its click data goes with it. Expired links are cleaned up automatically.</dd>
+        </div>
+      </dl>
+      <p class="muted">Our host, Cloudflare, handles requests the way any web host does. Don't take our word for the rest: the <a href="https://github.com/himanshusinghdev/tinyhop" rel="noopener">source code is public</a>, including the database schema.</p>
+    </section>
+
+    <section id="api" class="api" aria-labelledby="api-title">
+      <h2 id="api-title">Use it from your own code</h2>
+      <p>The same API powers this page. No key is needed.</p>
+      <pre><code id="curl-example"></code></pre>
+      <p class="muted">The reply includes <code>shortUrl</code> and a <code>manageToken</code>. Send the token as a Bearer header to read stats with <code>GET /api/links/:code</code> or remove the link with <code>DELETE</code>.</p>
+    </section>
+  </main>
+
+  <footer class="site">
+    <span>Tinyhop 2.0, MIT license</span>
+    <a href="https://github.com/himanshusinghdev/tinyhop" rel="noopener">View the code</a>
+  </footer>
+
+  <dialog id="stats-dialog" aria-labelledby="stats-title">
+    <div class="dialog-head">
+      <h2 id="stats-title">Link stats</h2>
+      <button class="ghost small" type="button" data-close>Close</button>
+    </div>
+    <div id="stats-body"></div>
+  </dialog>
+
+  <dialog id="qr-dialog" aria-labelledby="qr-title">
+    <div class="dialog-head">
+      <h2 id="qr-title">QR code</h2>
+      <button class="ghost small" type="button" data-close>Close</button>
+    </div>
+    <div id="qr-box" class="qr-box"></div>
+    <p id="qr-caption" class="muted"></p>
+    <div class="actions">
+      <button id="qr-download" class="primary small" type="button">Download SVG</button>
+    </div>
+  </dialog>
+</body>
+</html>

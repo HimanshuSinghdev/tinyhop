@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tinyhop",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+
+  // Static files in /public are served straight from Cloudflare's edge.
+  // The Worker only runs for paths that are NOT a file: /api/* and short codes.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // One D1 database holds links, clicks and rate-limit counters.
+  // database_id is left out on purpose: Cloudflare creates it on first deploy.
+  // If your deploy asks for it, create a D1 database named "tinyhop" in the
+  // dashboard and paste its id here.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "tinyhop" }
+  ],
+
+  // Daily cleanup of expired links, old clicks and rate-limit rows.
+  "triggers": { "crons": ["0 3 * * *"] },
+
+  "observability": { "enabled": false },
+
+  "vars": {
+    // Comma-separated hostnames that can never be shortened (subdomains included).
+    "BLOCKED_HOSTS": "",
+    // Creates allowed per visitor per minute.
+    "RATE_CREATE_PER_MIN": "10",
+    // Salt for hashing visitor IPs into rate-limit keys. Set your own via a secret.
+    "HASH_SALT": "change-me"
+  }
+}

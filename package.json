@@ -1,0 +1,17 @@
+{
+  "name": "tinyhop",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fast, open-source URL shortener on Cloudflare Workers + D1.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "node --check src/worker.js && node --check public/app.js",
+    "smoke": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
