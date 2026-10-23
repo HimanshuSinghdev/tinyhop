@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Report a link | Tinyhop</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/report.js"></script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="/"><img src="/favicon.svg" width="32" height="32" alt=""><span>Tinyhop</span></a>
+  </header>
+  <main class="notice">
+    <h1>Report a link.</h1>
+    <p>Tell us about a short link that is a scam, spreads malware, or breaks the rules. We store the link's code, your reason and your note, but not who you are.</p>
+
+    <form id="report-form" class="form-stack" novalidate>
+      <div class="field">
+        <label for="code">Short link</label>
+        <input class="input" id="code" name="code" type="text" inputmode="url" autocomplete="off"
+               autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste the short link" required>
+      </div>
+      <div class="field">
+        <label for="reason">What is wrong with it?</label>
+        <select class="input" id="reason" name="reason">
+          <option value="phishing">Phishing or scam</option>
+          <option value="malware">Malware</option>
+          <option value="spam">Spam</option>
+          <option value="illegal">Illegal content</option>
+          <option value="other">Something else</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="details">Details (optional)</label>
+        <textarea class="input" id="details" name="details" maxlength="500"></textarea>
+      </div>
+      <div><button id="send" class="primary" type="submit">Send report</button></div>
+      <p id="report-msg" class="msg" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+</body>
+</html>

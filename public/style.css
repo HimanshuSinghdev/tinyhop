@@ -261,3 +261,15 @@ dialog::backdrop { background: rgb(5 10 25 / 0.6); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- report form ---------- */
+
+.form-stack { display: grid; gap: 1rem; max-width: 34rem; }
+.input {
+  width: 100%; min-height: 3rem; padding: 0.7rem 0.8rem;
+  background: var(--card); color: var(--text);
+  border: 1.5px solid var(--line); border-radius: 12px; font: 1rem var(--sans);
+}
+.input:focus-visible { border-color: var(--blue); }
+textarea.input { min-height: 7rem; resize: vertical; }
+.msg.ok-text { color: var(--ok); font-weight: 600; }

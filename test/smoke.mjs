@@ -189,6 +189,16 @@ await test('CORS preflight works for the public API', async () => {
   expect(res.headers.get('access-control-allow-origin') === '*', 'CORS header missing');
 });
 
+await test('abuse reports: accepted, validated, unknown links rejected', async () => {
+  const made = await (await create({ url: 'https://example.com/report-me' })).json();
+  const send = (body) => call('/api/report', { method: 'POST', body });
+  const ok = await send({ code: made.code, reason: 'phishing', details: 'looks fake' });
+  expect(ok.status === 201, `report status ${ok.status}`);
+  expect((await send({ code: made.code, reason: 'because' })).status === 400, 'bad reason accepted');
+  expect((await send({ code: 'no spaces', reason: 'spam' })).status === 400, 'bad code accepted');
+  expect((await send({ code: 'zzzzzzz', reason: 'spam' })).status === 404, 'unknown link accepted');
+});
+
 await test('rate limit kicks in with Retry-After', async () => {
   let blocked;
   for (let i = 0; i < 80 && !blocked; i++) {

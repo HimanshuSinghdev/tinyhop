@@ -36,3 +36,14 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   count      INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- Abuse reports from the public "Report a link" form. We do not store who reported.
+CREATE TABLE IF NOT EXISTS reports (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  code    TEXT NOT NULL,
+  reason  TEXT NOT NULL,
+  details TEXT NOT NULL,
+  ts      INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_ts ON reports (ts);
