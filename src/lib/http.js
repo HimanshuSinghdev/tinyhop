@@ -39,3 +39,12 @@ export async function readJson(request, maxBytes = 16384) {
     return null;
   }
 }
+
+// Headers for HTML the Worker sends itself. The CSP allows only our own stylesheet and icons.
+export const HTML_HEADERS = {
+  'content-type': 'text/html; charset=utf-8',
+  'cache-control': 'no-store',
+  'content-security-policy':
+    "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  ...SECURITY_HEADERS,
+};

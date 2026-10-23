@@ -29,7 +29,13 @@ export function ensureSchema(db) {
 // ---------- links ----------
 
 export const getLink = (db, code) =>
-  db.prepare('SELECT * FROM links WHERE code = ?').bind(code).first();
+  db
+    .prepare(
+      `SELECT l.*, f.status AS flag FROM links l
+       LEFT JOIN link_flags f ON f.code = l.code WHERE l.code = ?`,
+    )
+    .bind(code)
+    .first();
 
 export async function insertLink(db, link) {
   try {
@@ -56,6 +62,7 @@ export const reclaimExpired = (db, code, now) =>
 export const deleteLink = (db, code) =>
   db.batch([
     db.prepare('DELETE FROM clicks WHERE code = ?').bind(code),
+    db.prepare('DELETE FROM link_flags WHERE code = ?').bind(code),
     db.prepare('DELETE FROM links WHERE code = ?').bind(code),
   ]);
 
@@ -167,6 +174,7 @@ export function purgeOld(db, now) {
     db
       .prepare('DELETE FROM links WHERE expires_at IS NOT NULL AND expires_at < ?')
       .bind(now - 30 * DAY_MS),
+    db.prepare('DELETE FROM link_flags WHERE code NOT IN (SELECT code FROM links)'),
   ]);
 }
 
@@ -177,3 +185,38 @@ export const insertReport = (db, report) =>
     .prepare('INSERT INTO reports (code, reason, details, ts) VALUES (?, ?, ?, ?)')
     .bind(report.code, report.reason, report.details, report.ts)
     .run();
+
+// ---------- moderation (admin page) ----------
+
+export const setFlag = (db, code, status, ts) =>
+  db
+    .prepare(
+      `INSERT INTO link_flags (code, status, ts) VALUES (?, ?, ?)
+       ON CONFLICT(code) DO UPDATE SET status = excluded.status, ts = excluded.ts`,
+    )
+    .bind(code, status, ts)
+    .run();
+
+export const clearFlag = (db, code) =>
+  db.prepare('DELETE FROM link_flags WHERE code = ?').bind(code).run();
+
+export const dismissReports = (db, code) =>
+  db.prepare('DELETE FROM reports WHERE code = ?').bind(code).run();
+
+// One row per reported code, newest first, with the link's current state.
+export async function listReports(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT r.code AS code, COUNT(*) AS reports, MAX(r.ts) AS lastAt,
+              GROUP_CONCAT(DISTINCT r.reason) AS reasons,
+              (SELECT d.details FROM reports d
+                 WHERE d.code = r.code AND d.details != '' ORDER BY d.ts DESC LIMIT 1) AS note,
+              l.url AS url, l.clicks AS clicks, f.status AS flag
+       FROM reports r
+       LEFT JOIN links l ON l.code = r.code
+       LEFT JOIN link_flags f ON f.code = r.code
+       GROUP BY r.code ORDER BY lastAt DESC LIMIT 100`,
+    )
+    .all();
+  return results;
+}

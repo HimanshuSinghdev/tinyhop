@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Reports | Tinyhop admin</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="/"><img src="/favicon.svg" width="32" height="32" alt=""><span>Tinyhop</span></a>
+  </header>
+  <main class="notice">
+    <h1>Reports.</h1>
+
+    <form id="login" class="form-stack" novalidate>
+      <p>Enter your admin token to review reported links.</p>
+      <div class="field">
+        <label for="token">Admin token</label>
+        <input class="input" id="token" name="token" type="password" autocomplete="current-password"
+               autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      </div>
+      <div><button class="primary" type="submit">Sign in</button></div>
+    </form>
+
+    <section id="panel" hidden>
+      <ul id="reports" class="rows"></ul>
+      <p id="none" class="empty" hidden>No reports. Nothing to review.</p>
+      <button id="signout" class="ghost small" type="button">Sign out</button>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

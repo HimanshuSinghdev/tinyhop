@@ -8,14 +8,18 @@
 import { bearerToken, newToken, sha256Hex, tokenMatches } from './lib/auth.js';
 import { ALIAS_PATTERN, checkAlias, isReserved, randomCode } from './lib/codes.js';
 import {
-  deleteLink, ensureSchema, getLink, getStats, hitRateLimit, insertLink,
-  insertReport, lookupLinks, purgeOld, reclaimExpired, recordClick,
+  clearFlag, deleteLink, dismissReports, ensureSchema, getLink, getStats, hitRateLimit,
+  insertLink, insertReport, listReports, lookupLinks, purgeOld, reclaimExpired, recordClick,
+  setFlag,
 } from './lib/db.js';
-import { CORS_HEADERS, SECURITY_HEADERS, fail, json, readJson } from './lib/http.js';
+import { CORS_HEADERS, HTML_HEADERS, SECURITY_HEADERS, fail, json, readJson } from './lib/http.js';
 import { normalizeTarget, parseList } from './lib/url.js';
 import { parseUserAgent, referrerHost } from './lib/ua.js';
+import { previewPage } from './lib/pages.js';
+import { isUnsafe } from './lib/safebrowsing.js';
 
 const CODE_PATH = /^\/([A-Za-z0-9_-]{3,32})$/;
+const PREVIEW_PATH = /^\/p\/([A-Za-z0-9_-]{3,32})$/;
 const MINUTE = 60_000;
 const EXPIRY_CHOICES = {
   never: null,
@@ -59,6 +63,9 @@ async function route(request, env, ctx) {
     return fail(405, 'method_not_allowed', 'Use GET for short links.', { allow: 'GET, HEAD' });
   }
 
+  const preview = PREVIEW_PATH.exec(url.pathname);
+  if (preview) return previewLink(env, url, preview[1]);
+
   const match = CODE_PATH.exec(url.pathname);
   if (match) return redirect(request, env, ctx, match[1]);
   return page(env, url, '/404.html', 404);
@@ -74,6 +81,10 @@ async function api(request, env, url) {
   if (pathname === '/api/links' && method === 'POST') return createLink(request, env, url);
   if (pathname === '/api/links/lookup' && method === 'POST') return lookup(request, env);
   if (pathname === '/api/report' && method === 'POST') return reportLink(request, env);
+
+  if (pathname === '/api/admin/reports' && method === 'GET') return adminReports(request, env);
+  const adminLink = /^\/api\/admin\/links\/([A-Za-z0-9_-]{3,32})$/.exec(pathname);
+  if (adminLink && method === 'POST') return adminAction(request, env, adminLink[1], url);
 
   const check = /^\/api\/check\/([^/]+)$/.exec(pathname);
   if (check && method === 'GET') return checkAvailability(env, decodeURIComponent(check[1]));
@@ -91,7 +102,7 @@ async function page(env, url, path, status) {
   const res = await env.ASSETS.fetch(new Request(new URL(path, url.origin)));
   return new Response(res.body, {
     status,
-    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...SECURITY_HEADERS },
+    headers: HTML_HEADERS,
   });
 }
 
@@ -115,6 +126,9 @@ async function redirect(request, env, ctx, code) {
     const link = await getLink(env.DB, code);
     if (!link) return page(env, url, '/404.html', 404);
     if (link.expires_at && link.expires_at <= now) return page(env, url, '/expired.html', 410);
+    // Moderation flags are never edge-cached, so they take effect as soon as the cache entry expires.
+    if (link.flag === 'disabled') return page(env, url, '/disabled.html', 410);
+    if (link.flag === 'warn') return html(previewPage({ code, target: link.url, warn: true }));
 
     target = link.url;
     const ttl = secondsUntil(link.expires_at, now);
@@ -204,6 +218,10 @@ async function createLink(request, env, url) {
   if (alias) {
     const verdict = checkAlias(alias);
     if (!verdict.ok) return fail(400, 'invalid_alias', verdict.message);
+  }
+
+  if (await isUnsafe(target.url, env.SAFE_BROWSING_KEY)) {
+    return fail(400, 'unsafe_url', 'Google Safe Browsing flagged this link as unsafe, so it cannot be shortened.');
   }
 
   const now = Date.now();
@@ -326,4 +344,77 @@ async function reportLink(request, env) {
   if (!(await getLink(env.DB, code))) return fail(404, 'not_found', 'That link does not exist.');
   await insertReport(env.DB, { code, reason: body.reason, details, ts: Date.now() });
   return json({ reported: true }, 201);
+}
+
+// ---------- preview page ----------
+
+const html = (body, status = 200) => new Response(body, { status, headers: HTML_HEADERS });
+
+// Shows where a short link goes without following it, and without counting a click.
+async function previewLink(env, url, code) {
+  await ensureSchema(env.DB);
+  const link = await getLink(env.DB, code);
+  if (!link) return page(env, url, '/404.html', 404);
+  if (link.expires_at && link.expires_at <= Date.now()) return page(env, url, '/expired.html', 410);
+  if (link.flag === 'disabled') return page(env, url, '/disabled.html', 410);
+  return html(previewPage({ code, target: link.url, warn: link.flag === 'warn' }));
+}
+
+// ---------- admin ----------
+// Turned on by adding an ADMIN_TOKEN secret. Without it every admin route answers 404.
+
+async function adminGuard(request, env) {
+  if (!env.ADMIN_TOKEN) return fail(404, 'admin_off', 'Admin is not set up. Add an ADMIN_TOKEN secret.');
+  const tooMany = await limited(request, env, 'admin', 30);
+  if (tooMany) return tooMany;
+  const given = bearerToken(request);
+  if (!(await tokenMatches(given, await sha256Hex(env.ADMIN_TOKEN)))) {
+    return fail(401, 'unauthorized', 'Wrong admin token.');
+  }
+  return null;
+}
+
+async function adminReports(request, env) {
+  const denied = await adminGuard(request, env);
+  if (denied) return denied;
+  await ensureSchema(env.DB);
+  return json({ reports: await listReports(env.DB) });
+}
+
+const ADMIN_ACTIONS = ['disable', 'warn', 'restore', 'dismiss', 'delete'];
+
+async function adminAction(request, env, code, url) {
+  const denied = await adminGuard(request, env);
+  if (denied) return denied;
+
+  const body = await readJson(request);
+  const action = body?.action;
+  if (!ADMIN_ACTIONS.includes(action)) {
+    return fail(400, 'invalid_action', `action must be one of: ${ADMIN_ACTIONS.join(', ')}.`);
+  }
+
+  await ensureSchema(env.DB);
+  if (action === 'dismiss') {
+    await dismissReports(env.DB, code);
+    return json({ ok: true });
+  }
+
+  const link = await getLink(env.DB, code);
+  if (!link) {
+    if (action !== 'delete') return fail(404, 'not_found', 'That link does not exist.');
+    await dismissReports(env.DB, code); // the link is already gone: just clear its reports
+    return json({ ok: true });
+  }
+
+  if (action === 'delete') {
+    await deleteLink(env.DB, code);
+    await dismissReports(env.DB, code);
+  } else if (action === 'restore') {
+    await clearFlag(env.DB, code);
+  } else {
+    await setFlag(env.DB, code, action === 'disable' ? 'disabled' : 'warn', Date.now());
+  }
+  // Clears this location's redirect cache. Other locations drop theirs within 60 seconds.
+  await caches.default.delete(new Request(new URL(`/__redirect/${code}`, url.origin).href));
+  return json({ ok: true });
 }
