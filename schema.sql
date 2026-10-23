@@ -47,3 +47,10 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_ts ON reports (ts);
+
+-- Moderation flags set from the admin page. 'disabled' stops the redirect, 'warn' shows a warning first.
+CREATE TABLE IF NOT EXISTS link_flags (
+  code   TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  ts     INTEGER NOT NULL
+);

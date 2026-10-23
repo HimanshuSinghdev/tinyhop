@@ -10,7 +10,7 @@ const RESERVED = new Set([
   'api', 'app', 'admin', 'assets', 'static', 'public', 'login', 'logout', 'signup',
   'privacy', 'terms', 'about', 'help', 'docs', 'status', 'health', 'stats', 'qr',
   'index', 'favicon', 'robots', 'sitemap', 'manifest', 'sw', 'vendor', 'security',
-  'www', 'mail', 'root', 'null', 'undefined',
+  'www', 'mail', 'root', 'null', 'undefined', 'report', 'preview', '404', 'expired', 'disabled',
 ]);
 
 export const isReserved = (code) => RESERVED.has(code.toLowerCase());

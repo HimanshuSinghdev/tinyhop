@@ -34,6 +34,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Author styles like display:grid would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -273,3 +276,10 @@ dialog::backdrop { background: rgb(5 10 25 / 0.6); }
 .input:focus-visible { border-color: var(--blue); }
 textarea.input { min-height: 7rem; resize: vertical; }
 .msg.ok-text { color: var(--ok); font-weight: 600; }
+
+/* ---------- preview, admin ---------- */
+
+a.text-btn, a.ghost { display: inline-flex; align-items: center; text-decoration: none; }
+.button-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.notice p.dest { font: 700 clamp(1.3rem, 5.5vw, 2rem)/1.2 var(--mono); color: var(--text); overflow-wrap: anywhere; margin-bottom: 0.5rem; }
+.notice p.wrap { margin-bottom: 1.5rem; }

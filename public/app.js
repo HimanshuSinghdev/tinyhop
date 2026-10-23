@@ -188,6 +188,7 @@ function historyRow(link) {
       textButton('Copy', (e) => copyText(shortUrl, e.currentTarget)),
       textButton('Stats', () => openStats(link)),
       textButton('QR code', () => openQr(link)),
+      el('a', { className: 'text-btn', href: `/p/${link.code}`, target: '_blank', rel: 'noopener', textContent: 'Preview' }),
       textButton('Delete', () => removeLinkFlow(link), 'danger'),
     ),
   );

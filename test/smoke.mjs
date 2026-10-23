@@ -199,6 +199,67 @@ await test('abuse reports: accepted, validated, unknown links rejected', async (
   expect((await send({ code: 'zzzzzzz', reason: 'spam' })).status === 404, 'unknown link accepted');
 });
 
+const ADMIN = process.env.ADMIN_TOKEN;
+if (!ADMIN) {
+  console.log('  skip admin tests (start the dev server with --var ADMIN_TOKEN:<value> and pass the same ADMIN_TOKEN here)');
+} else {
+  const admin = (path, opts = {}) => call(path, { ...opts, token: ADMIN });
+  const act = (code, action) => admin(`/api/admin/links/${code}`, { method: 'POST', body: { action } });
+  let flagged;
+
+  await test('admin rejects a missing or wrong token', async () => {
+    const none = await call('/api/admin/reports');
+    const wrong = await call('/api/admin/reports', { token: 'nope' });
+    expect(none.status === 401 && wrong.status === 401, `${none.status}/${wrong.status}`);
+  });
+
+  await test('admin sees a reported link with reason and note', async () => {
+    flagged = await (await create({ url: 'https://example.com/flag-me' })).json();
+    await call('/api/report', { method: 'POST', body: { code: flagged.code, reason: 'spam', details: 'seen in a scam message' } });
+    const { reports } = await (await admin('/api/admin/reports')).json();
+    const row = reports.find((r) => r.code === flagged.code);
+    expect(row && row.reports === 1 && row.reasons === 'spam' && row.note === 'seen in a scam message', JSON.stringify(row));
+    expect(row.url === 'https://example.com/flag-me' && row.flag === null, 'url or flag wrong');
+  });
+
+  await test('preview page shows the destination and does not count a click', async () => {
+    const res = await call(`/p/${flagged.code}`);
+    const text = await res.text();
+    expect(res.status === 200 && text.includes('example.com') && text.includes('Continue'), `status ${res.status}`);
+    expect(!text.includes('was reported'), 'normal preview must not show the warning');
+    const stats = await (await call(`/api/links/${flagged.code}`, { token: flagged.manageToken })).json();
+    expect(stats.clicks === 0, `preview counted ${stats.clicks} clicks`);
+  });
+
+  await test('warn shows a warning page instead of redirecting', async () => {
+    expect((await act(flagged.code, 'warn')).status === 200, 'warn failed');
+    const res = await call(`/${flagged.code}`);
+    expect(res.status === 200 && (await res.text()).includes('was reported'), `status ${res.status}`);
+  });
+
+  await test('disable returns 410, restore brings the redirect back', async () => {
+    expect((await act(flagged.code, 'disable')).status === 200, 'disable failed');
+    expect((await call(`/${flagged.code}`)).status === 410, 'disabled link should be 410');
+    expect((await call(`/p/${flagged.code}`)).status === 410, 'disabled preview should be 410');
+    expect((await act(flagged.code, 'restore')).status === 200, 'restore failed');
+    const res = await call(`/${flagged.code}`);
+    expect(res.status === 302 && res.headers.get('location') === 'https://example.com/flag-me', `status ${res.status}`);
+  });
+
+  await test('admin actions validate input', async () => {
+    expect((await act(flagged.code, 'explode')).status === 400, 'bad action accepted');
+    expect((await act('zzzzzzz', 'warn')).status === 404, 'unknown link accepted');
+  });
+
+  await test('dismiss clears reports, delete removes the link', async () => {
+    expect((await act(flagged.code, 'dismiss')).status === 200, 'dismiss failed');
+    let list = (await (await admin('/api/admin/reports')).json()).reports;
+    expect(!list.some((r) => r.code === flagged.code), 'report still listed');
+    expect((await act(flagged.code, 'delete')).status === 200, 'delete failed');
+    expect((await call(`/${flagged.code}`)).status === 404, 'link still exists');
+  });
+}
+
 await test('rate limit kicks in with Retry-After', async () => {
   let blocked;
   for (let i = 0; i < 80 && !blocked; i++) {
