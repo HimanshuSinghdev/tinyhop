@@ -1,8 +1,8 @@
 // Service worker: makes the app shell open instantly and work offline.
 // It never touches /api or short links, so redirects and click counts are always live.
 
-const CACHE = 'tinyhop-shell-v1';
-const SHELL = ['/', '/style.css', '/app.js', '/favicon.svg'];
+const CACHE = 'tinyhop-shell-v2';
+const SHELL = ['/', '/style.css', '/app.js', '/cursor.js', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));

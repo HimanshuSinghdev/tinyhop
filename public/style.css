@@ -269,3 +269,20 @@ a.text-btn { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- cursor tab (see cursor.js) ---------- */
+
+.cursor-tab { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 1000; opacity: 0; transition: opacity 0.2s; }
+.cursor-tab.on { opacity: 1; }
+.cursor-tab.on[data-state="text"] { opacity: 0; }
+.cursor-tab::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 12px; height: 12px;
+  translate: -50% -50%; transform: skewX(-14deg);
+  background: var(--accent); border: 2px solid transparent;
+  transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background-color 0.2s, border-color 0.2s, scale 0.15s;
+}
+.cursor-tab[data-state="link"]::before { width: 46px; height: 26px; background: transparent; border-color: var(--text); }
+.cursor-tab.pressed::before { scale: 0.6; }
+
+.cursor-scrap { position: fixed; left: 0; top: 0; width: 14px; height: 6px; pointer-events: none; z-index: 1000; background: var(--accent); clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
